@@ -117,8 +117,25 @@
                 <field name="price" width="auto" />
                 <field name="status" width="auto" />
                 <field name="partner_id" width="auto" />
+                <field name="validity"/>
+                <field name="date_deadline"/>
                 <!-- <field name="property_id" width="25%" /> -->
             </list>
+        </field>
+    </record>
+
+    <record id="estate_property_offer_form_view" model="ir.ui.view">
+        <field name="model">estate.property.offer</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <field name="price"/>
+                    <field name="status"/>
+                    <field name="partner_id"/>
+                    <field name="validity"/>
+                    <field name="date_deadline"/>
+                </group>
+            </form>
         </field>
     </record>
 

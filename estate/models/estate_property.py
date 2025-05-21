@@ -17,9 +17,7 @@ class Property(models.Model):
     def _compute_best_price(self):
         for record in self:
             prices = record.offer_ids.mapped("price")
-            record.best_price = max(prices) if prices else 0.0
-
-    
+            record.best_price = max(prices) if prices else 0.0  
 
 
     name = fields.Char(required=True)
@@ -61,7 +59,31 @@ class PropertyOffers(models.Model):
     _name = "estate.property.offer"
     _description = "Property Offer"
 
+
     price = fields.Float()
     status = fields.Selection(selection=[("accepted", "Accepted"), ("refused", "Refused")],copy=False)
     partner_id = fields.Many2one("res.partner", required=True)
     property_id = fields.Many2one("estate.property", required=True)
+    validity = fields.Integer(default=7)
+    date_deadline = fields.Date(compute="_compute_date_deadline", inverse="_inverse_date_deadline")
+
+
+    @api.depends("create_date", "validity")
+    def _compute_date_deadline(self):
+        for record in self:
+            create_date = record.create_date
+            if create_date:
+                record.date_deadline = create_date.date() + timedelta(days=record.validity)
+            else:
+                record.date_deadline = False
+
+    def _inverse_date_deadline(self):
+        for offer in self:
+            create_date = offer.create_date.date() if offer.create_date else date.today()
+        if offer.date_deadline:
+            deadline = offer.date_deadline
+            if isinstance(deadline, str):
+                deadline = fields.Date.from_string(deadline)
+            offer.validity = (deadline - create_date).days
+        else:
+            offer.validity = 0
