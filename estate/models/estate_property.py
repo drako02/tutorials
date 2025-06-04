@@ -1,8 +1,8 @@
 from datetime import date, timedelta
-from typing import List
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import float_utils
+
 
 class Property(models.Model):
     _name = "estate.property"
@@ -10,18 +10,7 @@ class Property(models.Model):
 
     def _default_date_availability(self):
         return date.today() + timedelta(days=90)
-
-    @api.depends("living_area", "garden_area")
-    def _compute_total_area(self):
-        for record in self:
-            record.total_area = record.living_area + record.garden_area
-
-    @api.depends("offer_ids.price")
-    def _compute_best_price(self):
-        for record in self:
-            prices = record.offer_ids.mapped("price")
-            record.best_price = max(prices) if prices else 0.0
-
+    
     _sql_constraints = [
         (
             "check_expected_price",
@@ -82,6 +71,19 @@ class Property(models.Model):
     total_area = fields.Char(compute="_compute_total_area")
     best_price = fields.Float(compute="_compute_best_price")
 
+    _order="id desc"
+
+    @api.depends("living_area", "garden_area")
+    def _compute_total_area(self):
+        for record in self:
+            record.total_area = record.living_area + record.garden_area
+
+    @api.depends("offer_ids.price")
+    def _compute_best_price(self):
+        for record in self:
+            prices = record.offer_ids.mapped("price")
+            record.best_price = max(prices) if prices else 0.0
+
     def set_sold(self):
         for record in self:
             previous_state = record.state
@@ -122,97 +124,23 @@ class Property(models.Model):
     @api.constrains("selling_price")
     def _check_selling_price(self):
         for record in self:
-            compare_res = float_utils.float_compare(record.selling_price, record.expected_price * 0.9, 4, )
-            
+            compare_res = float_utils.float_compare(
+                record.selling_price,
+                record.expected_price * 0.9,
+                4,
+            )
+
             print("compare_res", compare_res)
 
-            has_an_accepted_offer = record.offer_ids.filtered(lambda a :a.status == "accepted").mapped("id")
-            if(not has_an_accepted_offer):
+            has_an_accepted_offer = record.offer_ids.filtered(
+                lambda a: a.status == "accepted"
+            ).mapped("id")
+            if not has_an_accepted_offer:
                 continue
 
             if compare_res == 1 or compare_res == 0:
                 continue
 
             raise ValidationError(
-                    "The selling price cannot be less than  90% of the expected price"
-                )
-
-class PropertyType(models.Model):
-    _name = "estate.property.type"
-    _description = "Property Type"
-
-    _sql_constraints = [
-        ("check_type_name", "UNIQUE (name)", "This type name has already been used"),
-    ]
-
-    name = fields.Char(required=True)
-
-class PropertyTag(models.Model):
-    _name = "estate.property.tag"
-    _description = "Property Tag"
-
-    _sql_constraints = [
-        ("check_tag_name", "UNIQUE (name)", "This tag name has already been used"),
-    ]
-
-    name = fields.Char(required=True)
-
-class PropertyOffers(models.Model):
-    _name = "estate.property.offer"
-    _description = "Property Offer"
-
-    _sql_constraints = [
-        ("check_price", "CHECK (price > 0)", "The price should be greater than 0"),
-    ]
-
-    price = fields.Float()
-    status = fields.Selection(
-        selection=[("accepted", "Accepted"), ("refused", "Refused")], copy=False
-    )
-    partner_id = fields.Many2one("res.partner", required=True)
-    property_id = fields.Many2one("estate.property", required=True)
-    validity = fields.Integer(default=7)
-    date_deadline = fields.Date(
-        compute="_compute_date_deadline", inverse="_inverse_date_deadline", store=True
-    )
-
-    @api.depends("create_date", "validity")
-    def _compute_date_deadline(self):
-        for record in self:
-            create_date = record.create_date
-            if create_date:
-                record.date_deadline = create_date.date() + timedelta(
-                    days=record.validity
-                )
-            else:
-                record.date_deadline = False
-
-    def _inverse_date_deadline(self):
-        for offer in self:
-            create_date = (
-                offer.create_date.date() if offer.create_date else date.today()
+                "The selling price cannot be less than  90% of the expected price"
             )
-        if offer.date_deadline:
-            deadline = offer.date_deadline
-            if isinstance(deadline, str):
-                deadline = fields.Date.from_string(deadline)
-            offer.validity = (deadline - create_date).days
-        else:
-            offer.validity = 0
-
-    def accept_offer(self):
-        for record in self:
-            accepted_offers = record.property_id.offer_ids.filtered(
-                lambda r: r.status == "accepted"
-            ).mapped("price")
-
-            if len(accepted_offers) == 1:
-                raise UserError("An offer has already been accepted")
-
-            record.status = "accepted"
-            return True
-
-    def refuse_offer(self):
-        for record in self:
-            record.status = "refused"
-            return True
