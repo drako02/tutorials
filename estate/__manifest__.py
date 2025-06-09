@@ -6,6 +6,7 @@
     "depends": ["base"],
     "data": [
         "security/ir.model.access.csv",
+        
         "views/estate-property/view.xml",
         "views/estate-property/actions.xml",
         "views/estate-property/menus.xml",

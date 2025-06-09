@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from odoo import models, fields, api
 from odoo.exceptions import UserError
-
+from odoo.tools import float_utils
 
 
 class PropertyOffers(models.Model):
@@ -66,4 +66,16 @@ class PropertyOffers(models.Model):
         for record in self:
             record.status = "refused"
             return True
-    
+        
+    @api.model_create_multi
+    def create(self, vals):
+        self.env["estate.property"].browse(vals[0]["property_id"]).state = "offer_received"
+
+        existing_offers = self.env["estate.property"].browse(vals[0]["property_id"]).offer_ids.mapped("price")
+        
+        largest_offer = max(existing_offers)
+        if largest_offer > vals[0]["price"]:
+            raise UserError(f"Offer price must not be lower than {largest_offer}")
+        # print("existing_offers: ", existing_offers.mapped("price"))
+
+        return super(PropertyOffers, self).create(vals)

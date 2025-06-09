@@ -10,7 +10,7 @@ class Property(models.Model):
 
     def _default_date_availability(self):
         return date.today() + timedelta(days=90)
-    
+
     _sql_constraints = [
         (
             "check_expected_price",
@@ -71,7 +71,7 @@ class Property(models.Model):
     total_area = fields.Char(compute="_compute_total_area")
     best_price = fields.Float(compute="_compute_best_price")
 
-    _order="id desc"
+    _order = "id desc"
 
     @api.depends("living_area", "garden_area")
     def _compute_total_area(self):
@@ -144,3 +144,13 @@ class Property(models.Model):
             raise ValidationError(
                 "The selling price cannot be less than  90% of the expected price"
             )
+        
+    @api.ondelete(at_uninstall=False)
+    def on_delete(self):
+        for record in self:
+            state = record.state
+            if not (state == "new" or state == "cancelled"):
+                raise UserError("This property cannot be deleted")
+            
+
+    
